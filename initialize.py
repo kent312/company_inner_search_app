@@ -155,7 +155,7 @@ def initialize_retriever():
         db = Chroma.from_documents(splitted_docs, embedding=embeddings)
 
         # ベクターストアを検索するRetrieverの作成
-        st.session_state.retriever = db.as_retriever(search_kwargs={"k": 3})
+        st.session_state.retriever = db.as_retriever(search_kwargs={"k": 5})
         logger.info("Retrieverの作成が完了しました")
     except Exception as e:
         logger.error(f"Retriever初期化中にエラーが発生しました: {str(e)}")
