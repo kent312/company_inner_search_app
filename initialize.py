@@ -11,6 +11,7 @@ from logging.handlers import TimedRotatingFileHandler
 from uuid import uuid4
 import sys
 import unicodedata
+import csv
 from dotenv import load_dotenv
 import streamlit as st
 from docx import Document
@@ -18,6 +19,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
+from langchain.schema import Document as LangchainDocument
 import constants as ct
 
 
@@ -254,8 +256,125 @@ def file_load(path, docs_all):
 
     # 想定していたファイル形式の場合のみ読み込む
     if file_extension in ct.SUPPORTED_EXTENSIONS:
-        # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
-        loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
+        # 社員名簿.csvの場合は特別な処理を行う
+        if file_name == "社員名簿.csv" and file_extension == ".csv":
+            # 部門ごとにグループ化したドキュメントを作成
+            load_employee_csv_grouped(path, docs_all)
+        else:
+            # ファイルの拡張子に合ったdata loaderを使ってデータ読み込み
+            loader = ct.SUPPORTED_EXTENSIONS[file_extension](path)
+            docs = loader.load()
+            docs_all.extend(docs)
+
+
+def load_employee_csv_grouped(path, docs_all):
+    """
+    社員名簿CSVを部門ごとにグループ化して読み込む
+
+    Args:
+        path: CSVファイルパス
+        docs_all: データソースを格納する用のリスト
+    """
+    # 部門ごとのデータを格納する辞書
+    department_data = {}
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as file:
+            csv_reader = csv.DictReader(file)
+            
+            # 各行を部門ごとにグループ化
+            for row in csv_reader:
+                department = row.get('部署', '不明')
+                
+                if department not in department_data:
+                    department_data[department] = []
+                
+                # 従業員情報を整形して追加
+                employee_info = f"""
+社員ID: {row.get('社員ID', '')}
+氏名: {row.get('氏名（フルネーム）', '')}
+性別: {row.get('性別', '')}
+生年月日: {row.get('生年月日', '')}
+年齢: {row.get('年齢', '')}
+メールアドレス: {row.get('メールアドレス', '')}
+従業員区分: {row.get('従業員区分', '')}
+入社日: {row.get('入社日', '')}
+部署: {row.get('部署', '')}
+役職: {row.get('役職', '')}
+スキルセット: {row.get('スキルセット', '')}
+保有資格: {row.get('保有資格', '')}
+大学名: {row.get('大学名', '')}
+学部・学科: {row.get('学部・学科', '')}
+卒業年月日: {row.get('卒業年月日', '')}
+"""
+                department_data[department].append(employee_info.strip())
+        
+        # 部門ごとにドキュメントを作成
+        for department, employees in department_data.items():
+            # 部門の全従業員情報を1つのドキュメントにまとめる
+            content = f"【{department}の従業員一覧】\n\n"
+            content += f"{department}には{len(employees)}名の従業員が所属しています。\n\n"
+            
+            # 従業員情報を簡潔な形式で追加
+            content += "以下が従業員の詳細情報です：\n\n"
+            
+            employee_list = []
+            for employee in employees:
+                # 各従業員の情報から必要な項目を抽出
+                lines = employee.split('\n')
+                emp_dict = {}
+                for line in lines:
+                    if ': ' in line:
+                        key, value = line.split(': ', 1)
+                        emp_dict[key] = value
+                
+                employee_list.append(emp_dict)
+            
+            # 従業員情報を一覧形式で追加（簡潔版）
+            content += "【従業員リスト】\n"
+            for i, emp in enumerate(employee_list, 1):
+                content += f"{i}. {emp.get('氏名', '')} - 社員ID: {emp.get('社員ID', '')}, 役職: {emp.get('役職', '')}, メール: {emp.get('メールアドレス', '')}\n"
+            
+            # 主要な情報を含める（検索性向上のため）
+            content += "\n【部門情報】\n"
+            for emp in employee_list:
+                content += f"{emp.get('氏名', '')} {emp.get('従業員区分', '')} {emp.get('スキルセット', '')} {emp.get('保有資格', '')} {emp.get('大学名', '')}\n"
+            
+            # メタデータを設定
+            metadata = {
+                "source": path,
+                "department": department,
+                "employee_count": len(employees),
+                "file_type": "employee_roster"
+            }
+            
+            # LangChainのDocumentオブジェクトを作成
+            doc = LangchainDocument(page_content=content, metadata=metadata)
+            docs_all.append(doc)
+        
+        # 全社員の要約ドキュメントも作成
+        total_employees = sum(len(employees) for employees in department_data.values())
+        summary_content = f"""【社員名簿 - 全体要約】
+
+総従業員数: {total_employees}名
+
+部門別内訳:
+"""
+        for department, employees in department_data.items():
+            summary_content += f"- {department}: {len(employees)}名\n"
+        
+        summary_metadata = {
+            "source": path,
+            "file_type": "employee_roster_summary"
+        }
+        
+        summary_doc = LangchainDocument(page_content=summary_content, metadata=summary_metadata)
+        docs_all.append(summary_doc)
+        
+    except Exception as e:
+        logger.error(f"社員名簿CSVの読み込み中にエラーが発生しました: {str(e)}")
+        # エラーが発生した場合は通常のCSVLoaderを使用
+        loader = ct.SUPPORTED_EXTENSIONS[".csv"](path)
         docs = loader.load()
         docs_all.extend(docs)
 
