@@ -20,8 +20,8 @@ APP_NAME = "社内情報特化型生成AI検索アプリ"
 ANSWER_MODE_1 = "社内文書検索"
 ANSWER_MODE_2 = "社内問い合わせ"
 CHAT_INPUT_HELPER_TEXT = "こちらからメッセージを送信してください。"
-DOC_SOURCE_ICON = ":material/description: "
-LINK_SOURCE_ICON = ":material/link: "
+DOC_SOURCE_ICON = ":material/description:"
+LINK_SOURCE_ICON = ":material/link:"
 WARNING_ICON = ":material/warning:"
 ERROR_ICON = ":material/error:"
 SPINNER_TEXT = "回答生成中..."
@@ -87,6 +87,7 @@ SYSTEM_PROMPT_INQUIRY = """
     6. 複雑な質問の場合、各項目についてそれぞれ詳細に回答してください。
     7. 必要と判断した場合は、以下の文脈に基づかずとも、一般的な情報を回答してください。
 
+    【文脈】
     {context}
 """
 

@@ -42,8 +42,16 @@ def initialize():
     initialize_session_id()
     # ログ出力の設定
     initialize_logger()
-    # RAGのRetrieverを作成
-    initialize_retriever()
+    
+    # ロガーを取得
+    logger = logging.getLogger(ct.LOGGER_NAME)
+    
+    try:
+        # RAGのRetrieverを作成
+        initialize_retriever()
+    except Exception as e:
+        logger.error(f"Retriever初期化エラー: {str(e)}")
+        raise
 
 
 def initialize_logger():
@@ -106,36 +114,52 @@ def initialize_retriever():
     logger = logging.getLogger(ct.LOGGER_NAME)
 
     # すでにRetrieverが作成済みの場合、後続の処理を中断
-    if "retriever" in st.session_state:
+    if "retriever" in st.session_state and st.session_state.retriever is not None:
         return
     
-    # RAGの参照先となるデータソースの読み込み
-    docs_all = load_data_sources()
-
-    # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
-    for doc in docs_all:
-        doc.page_content = adjust_string(doc.page_content)
-        for key in doc.metadata:
-            doc.metadata[key] = adjust_string(doc.metadata[key])
+    # OpenAI APIキーの確認
+    if not os.getenv("OPENAI_API_KEY"):
+        logger.error("OPENAI_API_KEYが設定されていません")
+        raise ValueError("OPENAI_API_KEY環境変数が設定されていません。.envファイルを確認してください。")
     
-    # 埋め込みモデルの用意
-    embeddings = OpenAIEmbeddings()
-    
-    # チャンク分割用のオブジェクトを作成
-    text_splitter = CharacterTextSplitter(
-        chunk_size=500,
-        chunk_overlap=50,
-        separator="\n"
-    )
+    try:
+        # RAGの参照先となるデータソースの読み込み
+        logger.info("データソースの読み込みを開始します...")
+        docs_all = load_data_sources()
+        logger.info(f"データソースの読み込み完了: {len(docs_all)}個のドキュメント")
 
-    # チャンク分割を実施
-    splitted_docs = text_splitter.split_documents(docs_all)
+        # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
+        for doc in docs_all:
+            doc.page_content = adjust_string(doc.page_content)
+            for key in doc.metadata:
+                doc.metadata[key] = adjust_string(doc.metadata[key])
+        
+        # 埋め込みモデルの用意
+        logger.info("埋め込みモデルを初期化中...")
+        embeddings = OpenAIEmbeddings()
+        
+        # チャンク分割用のオブジェクトを作成
+        text_splitter = CharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50,
+            separator="\n"
+        )
 
-    # ベクターストアの作成
-    db = Chroma.from_documents(splitted_docs, embedding=embeddings)
+        # チャンク分割を実施
+        logger.info("ドキュメントをチャンク分割中...")
+        splitted_docs = text_splitter.split_documents(docs_all)
+        logger.info(f"チャンク分割完了: {len(splitted_docs)}個のチャンク")
 
-    # ベクターストアを検索するRetrieverの作成
-    st.session_state.retriever = db.as_retriever(search_kwargs={"k": 3})
+        # ベクターストアの作成
+        logger.info("ベクターストアを作成中...")
+        db = Chroma.from_documents(splitted_docs, embedding=embeddings)
+
+        # ベクターストアを検索するRetrieverの作成
+        st.session_state.retriever = db.as_retriever(search_kwargs={"k": 3})
+        logger.info("Retrieverの作成が完了しました")
+    except Exception as e:
+        logger.error(f"Retriever初期化中にエラーが発生しました: {str(e)}")
+        raise
 
 
 def initialize_session_state():
@@ -147,6 +171,22 @@ def initialize_session_state():
         st.session_state.messages = []
         # 「LLMとのやりとり用」の会話ログを順次格納するリストを用意
         st.session_state.chat_history = []
+    
+    # モードの初期化（社内文書検索をデフォルトに設定）
+    if "mode" not in st.session_state:
+        st.session_state.mode = ct.ANSWER_MODE_1
+    
+    # 初期化フラグの設定
+    if "initialized" not in st.session_state:
+        st.session_state.initialized = False
+    
+    # セッションIDの初期化
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = None
+    
+    # Retrieverの初期化
+    if "retriever" not in st.session_state:
+        st.session_state.retriever = None
 
 
 def load_data_sources():

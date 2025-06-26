@@ -140,12 +140,32 @@ def display_search_llm_response(llm_response):
     Returns:
         LLMからの回答を画面表示用に整形した辞書データ
     """
+    # レスポンスの構造を検証
+    if not isinstance(llm_response, dict):
+        st.error("レスポンスの形式が正しくありません。", icon=ct.ERROR_ICON)
+        return {"mode": ct.ANSWER_MODE_1, "answer": "エラーが発生しました。", "no_file_path_flg": True}
+    
+    # 必要なキーが存在するか確認
+    if "context" not in llm_response or "answer" not in llm_response:
+        st.error("レスポンスに必要な情報が含まれていません。", icon=ct.ERROR_ICON)
+        return {"mode": ct.ANSWER_MODE_1, "answer": "エラーが発生しました。", "no_file_path_flg": True}
+    
     # LLMからのレスポンスに参照元情報が入っており、かつ「該当資料なし」が回答として返された場合
     if llm_response["context"] and llm_response["answer"] != ct.NO_DOC_MATCH_ANSWER:
 
         # ==========================================
         # ユーザー入力値と最も関連性が高いメインドキュメントのありかを表示
         # ==========================================
+        # contextが空でないことを確認
+        if not llm_response["context"] or len(llm_response["context"]) == 0:
+            st.markdown(ct.NO_DOC_MATCH_MESSAGE)
+            return {"mode": ct.ANSWER_MODE_1, "answer": ct.NO_DOC_MATCH_MESSAGE, "no_file_path_flg": True}
+        
+        # メタデータの存在を確認
+        if not hasattr(llm_response["context"][0], 'metadata') or "source" not in llm_response["context"][0].metadata:
+            st.markdown(ct.NO_DOC_MATCH_MESSAGE)
+            return {"mode": ct.ANSWER_MODE_1, "answer": ct.NO_DOC_MATCH_MESSAGE, "no_file_path_flg": True}
+        
         # LLMからのレスポンス（辞書）の「context」属性の中の「0」に、最も関連性が高いドキュメント情報が入っている
         main_file_path = llm_response["context"][0].metadata["source"]
 
@@ -267,49 +287,65 @@ def display_contact_llm_response(llm_response):
     Returns:
         LLMからの回答を画面表示用に整形した辞書データ
     """
+    # レスポンスの構造を検証
+    if not isinstance(llm_response, dict):
+        st.error("レスポンスの形式が正しくありません。", icon=ct.ERROR_ICON)
+        return {"mode": ct.ANSWER_MODE_2, "answer": "エラーが発生しました。"}
+    
+    # 必要なキーが存在するか確認
+    if "answer" not in llm_response:
+        st.error("レスポンスに必要な情報が含まれていません。", icon=ct.ERROR_ICON)
+        return {"mode": ct.ANSWER_MODE_2, "answer": "エラーが発生しました。"}
+    
     # LLMからの回答を表示
     st.markdown(llm_response["answer"])
 
     # ユーザーの質問・要望に適切な回答を行うための情報が、社内文書のデータベースに存在しなかった場合
     if llm_response["answer"] != ct.INQUIRY_NO_MATCH_ANSWER:
-        # 区切り線を表示
-        st.divider()
+        # contextキーが存在し、かつ空でないことを確認
+        if "context" in llm_response and llm_response["context"]:
+            # 区切り線を表示
+            st.divider()
 
-        # 補足メッセージを表示
-        message = "情報源"
-        st.markdown(f"##### {message}")
+            # 補足メッセージを表示
+            message = "情報源"
+            st.markdown(f"##### {message}")
 
-        # 参照元のファイルパスの一覧を格納するためのリストを用意
-        file_path_list = []
-        file_info_list = []
+            # 参照元のファイルパスの一覧を格納するためのリストを用意
+            file_path_list = []
+            file_info_list = []
 
-        # LLMが回答生成の参照元として使ったドキュメントの一覧が「context」内のリストの中に入っているため、ループ処理
-        for document in llm_response["context"]:
-            # ファイルパスを取得
-            file_path = document.metadata["source"]
-            # ファイルパスの重複は除去
-            if file_path in file_path_list:
-                continue
+            # LLMが回答生成の参照元として使ったドキュメントの一覧が「context」内のリストの中に入っているため、ループ処理
+            for document in llm_response["context"]:
+                # メタデータの存在を確認
+                if not hasattr(document, 'metadata') or "source" not in document.metadata:
+                    continue
+                
+                # ファイルパスを取得
+                file_path = document.metadata["source"]
+                # ファイルパスの重複は除去
+                if file_path in file_path_list:
+                    continue
 
-            # ページ番号が取得できた場合のみ、ページ番号を表示（ドキュメントによっては取得できない場合がある）
-            if "page" in document.metadata:
-                # ページ番号を取得
-                page_number = document.metadata["page"]
-                # 「ファイルパス」と「ページ番号」
-                file_info = f"{file_path}"
-            else:
-                # 「ファイルパス」のみ
-                file_info = f"{file_path}"
+                # ページ番号が取得できた場合のみ、ページ番号を表示（ドキュメントによっては取得できない場合がある）
+                if "page" in document.metadata:
+                    # ページ番号を取得
+                    page_number = document.metadata["page"]
+                    # 「ファイルパス」と「ページ番号」
+                    file_info = f"{file_path}"
+                else:
+                    # 「ファイルパス」のみ
+                    file_info = f"{file_path}"
 
-            # 参照元のありかに応じて、適したアイコンを取得
-            icon = utils.get_source_icon(file_path)
-            # ファイル情報を表示
-            st.info(file_info, icon=icon)
+                # 参照元のありかに応じて、適したアイコンを取得
+                icon = utils.get_source_icon(file_path)
+                # ファイル情報を表示
+                st.info(file_info, icon=icon)
 
-            # 重複チェック用に、ファイルパスをリストに順次追加
-            file_path_list.append(file_path)
-            # ファイル情報をリストに順次追加
-            file_info_list.append(file_info)
+                # 重複チェック用に、ファイルパスをリストに順次追加
+                file_path_list.append(file_path)
+                # ファイル情報をリストに順次追加
+                file_info_list.append(file_info)
 
     # 表示用の会話ログに格納するためのデータを用意
     # - 「mode」: モード（「社内文書検索」or「社内問い合わせ」）
@@ -320,7 +356,7 @@ def display_contact_llm_response(llm_response):
     content["mode"] = ct.ANSWER_MODE_2
     content["answer"] = llm_response["answer"]
     # 参照元のドキュメントが取得できた場合のみ
-    if llm_response["answer"] != ct.INQUIRY_NO_MATCH_ANSWER:
+    if llm_response["answer"] != ct.INQUIRY_NO_MATCH_ANSWER and "context" in llm_response and llm_response["context"] and file_info_list:
         content["message"] = message
         content["file_info_list"] = file_info_list
 

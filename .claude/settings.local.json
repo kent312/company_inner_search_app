@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python test:*)",
+      "Bash(python3:*)",
+      "Bash(rm:*)",
+      "Bash(pip install:*)",
+      "Bash(pip3:*)",
+      "Bash(ls:*)",
+      "Bash(/mnt/e/company_inner_search_app/env/Scripts/pip.exe install pymupdf)",
+      "Bash(grep:*)",
+      "Bash(/mnt/e/company_inner_search_app/env/Scripts/pip.exe uninstall -y pymupdf)",
+      "Bash(/mnt/e/company_inner_search_app/env/Scripts/pip.exe install PyMuPDF==1.25.2)",
+      "Bash(/mnt/e/company_inner_search_app/env/Scripts/pip.exe install -r /mnt/e/company_inner_search_app/requirements_windows.txt)",
+      "Bash(/mnt/e/company_inner_search_app/env/Scripts/python.exe -m streamlit run main.py)",
+      "Bash(touch:*)",
+      "Bash(python:*)",
+      "Bash(source:*)",
+      "Bash(env/Scripts/pip install:*)",
+      "Bash(env/Scripts/python.exe -m pip install:*)",
+      "Bash(env/Scripts/python.exe -m streamlit run:*)"
+    ],
+    "deny": []
+  }
+}

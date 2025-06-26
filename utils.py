@@ -83,6 +83,10 @@ def get_llm_response(chat_message):
     )
 
     # モードによってLLMから回答を取得する用のプロンプトを変更
+    # session_stateのmodeが存在しない場合のエラーハンドリング
+    if not hasattr(st.session_state, 'mode') or st.session_state.mode is None:
+        st.session_state.mode = ct.ANSWER_MODE_1
+    
     if st.session_state.mode == ct.ANSWER_MODE_1:
         # モードが「社内文書検索」の場合のプロンプト
         question_answer_template = ct.SYSTEM_PROMPT_DOC_SEARCH
@@ -99,6 +103,10 @@ def get_llm_response(chat_message):
     )
 
     # 会話履歴なしでもLLMに理解してもらえる、独立した入力テキストを取得するためのRetrieverを作成
+    # retrieverが存在しない場合のエラーハンドリング
+    if not hasattr(st.session_state, 'retriever') or st.session_state.retriever is None:
+        raise ValueError("Retrieverが初期化されていません。アプリケーションを再起動してください。")
+    
     history_aware_retriever = create_history_aware_retriever(
         llm, st.session_state.retriever, question_generator_prompt
     )
@@ -109,6 +117,10 @@ def get_llm_response(chat_message):
     chain = create_retrieval_chain(history_aware_retriever, question_answer_chain)
 
     # LLMへのリクエストとレスポンス取得
+    # chat_historyが存在しない場合のエラーハンドリング
+    if not hasattr(st.session_state, 'chat_history') or st.session_state.chat_history is None:
+        st.session_state.chat_history = []
+    
     llm_response = chain.invoke({"input": chat_message, "chat_history": st.session_state.chat_history})
     # LLMレスポンスを会話履歴に追加
     st.session_state.chat_history.extend([HumanMessage(content=chat_message), llm_response["answer"]])
