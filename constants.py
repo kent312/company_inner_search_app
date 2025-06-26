@@ -56,6 +56,11 @@ WEB_URL_LOAD_TARGETS = [
     "https://generative-ai.web-camp.io/"
 ]
 
+# RAG検索パラメータ
+RETRIEVER_TOP_K = 5  # ベクターストアから取得する関連ドキュメント数
+CHUNK_SIZE = 500  # ドキュメントチャンクのサイズ
+CHUNK_OVERLAP = 50  # チャンク間のオーバーラップサイズ
+
 
 # ==========================================
 # プロンプトテンプレート

@@ -18,7 +18,8 @@
       "Bash(source:*)",
       "Bash(env/Scripts/pip install:*)",
       "Bash(env/Scripts/python.exe -m pip install:*)",
-      "Bash(env/Scripts/python.exe -m streamlit run:*)"
+      "Bash(env/Scripts/python.exe -m streamlit run:*)",
+      "Bash(rg:*)"
     ],
     "deny": []
   }
